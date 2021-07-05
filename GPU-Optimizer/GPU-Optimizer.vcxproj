@@ -160,6 +160,7 @@
     <ClInclude Include="src\init.h" />
     <ClInclude Include="src\mainloop.h" />
     <ClInclude Include="src\memory.h" />
+    <ClInclude Include="src\natives.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
