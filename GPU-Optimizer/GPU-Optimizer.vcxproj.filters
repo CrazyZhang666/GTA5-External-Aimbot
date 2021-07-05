@@ -24,12 +24,18 @@
     <ClCompile Include="src\init.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\mainloop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\memory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\init.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\mainloop.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
