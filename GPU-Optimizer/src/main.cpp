@@ -9,7 +9,7 @@ int main()
 {
 	try
 	{
-		auto mem = std::make_unique<Memory>(L"GTA5.exe", L"GTA5.exe", PROCESS_VM_READ);
+		auto mem = std::make_unique<Memory>(L"GTA5.exe", L"GTA5.exe", PROCESS_ALL_ACCESS);
 		auto init = std::make_unique<Init>(mem.get());
 		auto mainLoop = std::make_unique<MainLoop>(mem.get(), init.get());
 		mainLoop->Run();

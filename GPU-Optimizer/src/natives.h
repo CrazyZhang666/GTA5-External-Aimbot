@@ -2,8 +2,7 @@
 
 #include <windows.h>
 #include <cstdint>
-
-using D3DXVECTOR3 = float[3];
+#include <d3dx9math.h>
 
 #pragma pack(push, 1)
 struct entity_t
@@ -46,5 +45,45 @@ struct player_info_t
 {
 	char pad_0x0000[0xA4]; // 0x0000
 	char name[20]; // 0x00A4
+};
+
+struct viewport_t
+{
+	char pad_0x0000[0x24C]; // 0x0000
+	D3DXMATRIX viewmatrix; // 0x024C
+};
+
+enum ped_types
+{
+	PLAYER_0, // michael
+	PLAYER_1, // franklin
+	NETWORK_PLAYER, // mp character
+	PLAYER_2, // trevor
+	CIVMALE,
+	CIVFEMALE,
+	COP,
+	GANG_ALBANIAN,
+	GANG_BIKER_1,
+	GANG_BIKER_2,
+	GANG_ITALIAN,
+	GANG_RUSSIAN,
+	GANG_RUSSIAN_2,
+	GANG_IRISH,
+	GANG_JAMAICAN,
+	GANG_AFRICAN_AMERICAN,
+	GANG_KOREAN,
+	GANG_CHINESE_JAPANESE,
+	GANG_PUERTO_RICAN,
+	DEALER,
+	MEDIC,
+	FIREMAN,
+	CRIMINAL,
+	BUM,
+	PROSTITUTE,
+	SPECIAL,
+	MISSION,
+	SWAT,
+	ANIMAL,
+	ARMY
 };
 #pragma pack(pop)

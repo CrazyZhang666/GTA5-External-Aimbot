@@ -1,5 +1,6 @@
 #include "mainloop.h"
 #include "natives.h"
+#include "utils.h"
 
 #include <iostream>
 #include <chrono>
@@ -19,12 +20,17 @@ void MainLoop::Run()
 {
 	while (true)
 	{
+		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
+
+		auto localPlayerPtr = m_mem->ReadPtr(m_init->world + 0x8);
+
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
 		auto pedList = m_mem->ReadPtr(pedInterface + 0x100);
 		auto pedCount = m_mem->Read<int32_t>(pedInterface + 0x110);
 
-		system("cls");
-		std::cout << pedCount << std::endl;
+		std::optional<D3DXVECTOR2> closestFov;
+		//system("cls");
+		//std::cout << pedCount << std::endl;
 		for (int32_t i = 0; i < pedCount; i++)
 		{
 			auto pedPtr = m_mem->ReadPtr(pedList + 0x10ull * i);
@@ -35,17 +41,41 @@ void MainLoop::Run()
 				continue;
 			}
 
-			std::cout << GetCorrectPedType(ped.ped_type) << ' ' << ped.health;
+			//std::cout << GetCorrectPedType(ped.ped_type) << ' ' << ped.health << ' ' << ped.armor;
+			//std::cout << std::hex << ' ' << pedPtr << std::dec;
+
+			auto screenPos = Utils::WorldToScreen(ped.pos, viewport);
+			if (screenPos)
+			{
+				//std::cout << ' ' << screenPos->x << ' ' << screenPos->y;
+
+				if (!closestFov || Utils::Distance(screenPos.value(), Utils::screenCenter) < Utils::Distance(closestFov.value(), Utils::screenCenter))
+				{
+					closestFov = screenPos;
+				}
+			}
+
 			if (ped.player_info)
 			{
 				auto player_info = m_mem->Read<player_info_t>(ped.player_info);
-				std::cout << ' ' << player_info.name;
+				//std::cout << ' ' << "player" << ' ' << player_info.name;
 			}
-			std::cout << std::endl;
+			if (pedPtr == localPlayerPtr)
+			{
+				ped.bike_seatbelt = 0xC9;
+				//m_mem->Write(pedPtr, ped);
+				//std::cout << ' ' << "localPlayer";
+			}
+			//std::cout << std::endl;
 		}
 
+		if (closestFov && GetAsyncKeyState('X') & 0x8000)
+		{
+			auto delta = closestFov.value() - Utils::screenCenter;
+			mouse_event(MOUSEEVENTF_MOVE, delta.x, delta.y, 0, 0);
+		}
 
 		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(1s);
+		std::this_thread::sleep_for(100us);
 	}
 }
