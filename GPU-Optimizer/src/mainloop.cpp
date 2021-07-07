@@ -20,9 +20,25 @@ void MainLoop::Run()
 {
 	while (true)
 	{
+		using namespace std::chrono_literals;
+		std::this_thread::sleep_for(100us);
+
+		if (!m_mem->IsTargetWindowValid())
+		{
+			throw std::runtime_error("Lost target window.");
+		}
+
+		if (!m_mem->IsTargetWindowMaximized())
+		{
+			continue;
+		}
+
 		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
 
 		auto localPlayerPtr = m_mem->ReadPtr(m_init->world + 0x8);
+		auto localPlayer = m_mem->Read<ped_t>(localPlayerPtr);
+		ProcessLocalPlayer(localPlayer, localPlayerPtr);
+		m_mem->Write(localPlayerPtr, localPlayer);
 
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
 		auto pedList = m_mem->ReadPtr(pedInterface + 0x100);
@@ -62,7 +78,8 @@ void MainLoop::Run()
 			}
 			if (pedPtr == localPlayerPtr)
 			{
-				ped.bike_seatbelt = 0xC9;
+				//ped.bike_seatbelt = 0xC9;
+				//ped.health = 200.0f;
 				//m_mem->Write(pedPtr, ped);
 				//std::cout << ' ' << "localPlayer";
 			}
@@ -74,8 +91,16 @@ void MainLoop::Run()
 			auto delta = closestFov.value() - Utils::screenCenter;
 			mouse_event(MOUSEEVENTF_MOVE, delta.x, delta.y, 0, 0);
 		}
+	}
+}
 
-		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(100us);
+void MainLoop::ProcessLocalPlayer(ped_t& localPlayer, uint64_t localPlayerPtr)
+{
+	// Set full HP (shift + alt + f5).
+	//if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000)
+	if (GetAsyncKeyState(VK_LSHIFT) & 0x1)
+	{
+		localPlayer.health = 150.0f + rand() % 50;
+		//m_mem->Write(localPlayerPtr, localPlayer);
 	}
 }

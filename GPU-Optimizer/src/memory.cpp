@@ -4,22 +4,36 @@
 #include <stdexcept>
 #include <memory>
 
-Memory::Memory(std::wstring_view processName, std::wstring_view moduleName, DWORD accessRights)
+Memory::Memory(std::vector<std::wstring_view>&& windowNames, std::wstring_view moduleName, DWORD accessRights)
 {
-	auto pid = GetPid(processName);
+	m_targetWindow = 0;
+	for (auto windowName : windowNames)
+	{
+		if (m_targetWindow = FindWindow(nullptr, windowName.data()))
+		{
+			break;
+		}
+	}
+	if (!m_targetWindow)
+	{
+		throw std::runtime_error("Target window not found.");
+	}
+
+	DWORD pid;
+	GetWindowThreadProcessId(m_targetWindow, &pid);
 	if (!pid)
 	{
 		throw std::runtime_error("Pid not found.");
 	}
 
-	auto module = GetModule(pid.value(), moduleName);
+	auto module = GetModule(pid, moduleName);
 	if (!module)
 	{
 		throw std::runtime_error("Module not found.");
 	}
 	mainModule = std::move(module.value());
 
-	m_process = OpenProcess(accessRights, false, pid.value());
+	m_process = OpenProcess(accessRights, false, pid);
 	if (!m_process)
 	{
 		throw std::runtime_error("Failed to obtain handle.");
@@ -57,25 +71,14 @@ std::optional<uint64_t> Memory::PatternScan(uint64_t start, DWORD size, const BY
 	return {};
 }
 
-std::optional<DWORD> Memory::GetPid(std::wstring_view processName) const
+bool Memory::IsTargetWindowMaximized() const
 {
-	PROCESSENTRY32 entry;
-	entry.dwSize = sizeof(PROCESSENTRY32);
-	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-	std::optional<DWORD> pid;
-	if (Process32First(snapshot, &entry))
-	{
-		do
-		{
-			if (_wcsicmp(entry.szExeFile, processName.data()) == 0)
-			{
-				pid = entry.th32ProcessID;
-				break;
-			}
-		} while (Process32Next(snapshot, &entry));
-	}
-	CloseHandle(snapshot);
-	return pid;
+	return GetForegroundWindow() == m_targetWindow;
+}
+
+bool Memory::IsTargetWindowValid() const
+{
+	return IsWindow(m_targetWindow);
 }
 
 std::optional<Memory::Module> Memory::GetModule(DWORD pid, std::wstring_view moduleName) const

@@ -3,15 +3,20 @@
 #include <windows.h>
 #include <string_view>
 #include <optional>
+#include <vector>
 
 class Memory
 {
 public:
-	Memory(std::wstring_view processName, std::wstring_view moduleName, DWORD accessRights = PROCESS_ALL_ACCESS);
+	Memory(std::vector<std::wstring_view>&& windowNames, std::wstring_view moduleName, DWORD accessRights = PROCESS_ALL_ACCESS);
 
 	~Memory();
 
 	std::optional<uint64_t> PatternScan(uint64_t start, DWORD size, const BYTE* pattern, std::string_view mask, DWORD patternSize) const;
+
+	bool IsTargetWindowMaximized() const;
+
+	bool IsTargetWindowValid() const;
 
 	template<typename T>
 	T Read(uint64_t address) const
@@ -39,7 +44,6 @@ private:
 		DWORD size;
 	};
 
-	std::optional<DWORD> GetPid(std::wstring_view processName) const;
 	std::optional<Module> GetModule(DWORD pid, std::wstring_view moduleName) const;
 
 public:
@@ -47,4 +51,5 @@ public:
 
 private:
 	HANDLE m_process;
+	HWND m_targetWindow;
 };
