@@ -44,7 +44,9 @@ struct ped_t : entity_t
 struct player_info_t
 {
 	char pad_0x0000[0xA4]; // 0x0000
-	char name[20]; // 0x00A4
+	char name[0x14]; // 0x00A4
+	char pad_0x00B8[0xD9B]; // 0x00B8
+	BYTE is_aiming; // 0x0E53
 };
 
 struct viewport_t

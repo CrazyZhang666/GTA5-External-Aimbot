@@ -39,7 +39,8 @@ void MainLoop::Run()
 		{
 			continue;
 		}
-		ProcessLocalPlayer(localPlayer);
+		PlayerInfo localPlayerInfo(m_mem, localPlayer.obj.player_info);
+		ProcessLocalPlayer(localPlayer, localPlayerInfo);
 
 		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
@@ -56,11 +57,11 @@ void MainLoop::Run()
 			}
 		}
 
-		Aimbot(localPlayer, peds, viewport);
+		Aimbot(localPlayer, localPlayerInfo, peds, viewport);
 	}
 }
 
-void MainLoop::ProcessLocalPlayer(Ped& localPlayer)
+void MainLoop::ProcessLocalPlayer(Ped& localPlayer, PlayerInfo& localPlayerInfo)
 {
 	// Set full HP (shift + alt + f5).
 	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F5) & 0x1)
@@ -70,52 +71,62 @@ void MainLoop::ProcessLocalPlayer(Ped& localPlayer)
 	}
 }
 
-void MainLoop::Aimbot(const Ped& localPlayer, const std::vector<Ped>& peds, const viewport_t& viewport)
+void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<Ped>& peds, const viewport_t& viewport)
 {
 	constexpr float maxDistance = 150.0f;
 	constexpr float maxFov = 100.0f;
 
-	if (!(GetAsyncKeyState('X') & 0x8000))
+	static uint64_t rememberedTargetAddr = 0;
+
+	if (GetAsyncKeyState('X') & 0x8000 && localPlayerInfo.obj.is_aiming)
 	{
-		return;
+		std::optional<std::tuple<uint64_t, float, D3DXVECTOR2>> bestTarget;
+		for (const auto& ped : peds)
+		{
+			if (rememberedTargetAddr && ped.addr != rememberedTargetAddr)
+			{
+				continue;
+			}
+
+			if (ped.addr == localPlayer.addr || Utils::Distance(ped.obj.pos, localPlayer.obj.pos) > maxDistance)
+			{
+				continue;
+			}
+
+			decltype(bestTarget)::value_type current;
+			auto& [pedAddr, fov, delta] = current;
+			pedAddr = ped.addr;
+			auto screenPosOptional = Utils::WorldToScreen(ped.obj.pos, viewport);
+			if (!screenPosOptional)
+			{
+				continue;
+			}
+			delta = screenPosOptional.value() - Utils::screenCenter;
+			fov = D3DXVec2Length(&delta);
+
+			if (fov > maxFov)
+			{
+				continue;
+			}
+
+			if (!bestTarget || fov < std::get<1>(bestTarget.value()))
+			{
+				bestTarget = current;
+			}
+		}
+
+		if (bestTarget)
+		{
+			auto [pedAddr, fov, delta] = bestTarget.value();
+			auto deltaLength = D3DXVec2Length(&delta);
+			delta = delta / 2.5f + Utils::ClampVector2Length(delta, 2.5f);
+			delta = Utils::ClampVector2Length(delta, deltaLength);
+			mouse_event(MOUSEEVENTF_MOVE, (DWORD)delta.x, (DWORD)delta.y, 0, 0);
+			rememberedTargetAddr = pedAddr;
+		}
 	}
-
-	std::optional<std::tuple<const Ped*, float, D3DXVECTOR2>> bestTarget;
-	for (const auto& ped : peds)
+	else
 	{
-		if (ped.addr == localPlayer.addr || Utils::Distance(ped.obj.pos, localPlayer.obj.pos) > maxDistance)
-		{
-			continue;
-		}
-
-		decltype(bestTarget)::value_type current;
-		auto& [pedPtr, fov, delta] = current;
-		pedPtr = &ped;
-		auto screenPosOptional = Utils::WorldToScreen(ped.obj.pos, viewport);
-		if (!screenPosOptional)
-		{
-			continue;
-		}
-		delta = screenPosOptional.value() - Utils::screenCenter;
-		fov = D3DXVec2Length(&delta);
-
-		if (fov > maxFov)
-		{
-			continue;
-		}
-
-		if (!bestTarget || fov < std::get<1>(bestTarget.value()))
-		{
-			bestTarget = current;
-		}
-	}
-
-	if (bestTarget)
-	{
-		auto [pedPtr, fov, delta] = bestTarget.value();
-		auto deltaLength = D3DXVec2Length(&delta);
-		delta = delta / 2.5f + Utils::ClampVector2Length(delta, 2.5f);
-		delta = Utils::ClampVector2Length(delta, deltaLength);
-		mouse_event(MOUSEEVENTF_MOVE, (DWORD)delta.x, (DWORD)delta.y, 0, 0);
+		rememberedTargetAddr = 0;
 	}
 }
