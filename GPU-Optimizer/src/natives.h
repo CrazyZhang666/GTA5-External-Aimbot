@@ -13,7 +13,8 @@ struct entity_t
 	BYTE invisible; // 0x002C
 	char pad_0x002D[0x3]; // 0x002D
 	uint64_t pos_base; // 0x0030
-	char pad_0x0038[0x58]; // 0x0038
+	char pad_0x0038[0x28]; // 0x0038
+	char matrix[0x30]; // 0x0060
 	D3DXVECTOR3 pos; // 0x0090
 	char pad_0x009C[0xED]; // 0x009C
 	BYTE god; // 0x0189
@@ -25,7 +26,9 @@ struct entity_t
 
 struct ped_t : entity_t
 {
-	char pad_0x02A4[0xA8C]; // 0x02A4
+	char pad_0x02A4[0x18C]; // 0x02A4
+	D3DXVECTOR4 bones[12]; // 0x0430
+	char pad_0x04F0[0x840]; // 0x04F0
 	uint64_t vehicle; // 0x0D30
 	char pad_0x0D38[0x380]; // 0x0D38
 	uint32_t ped_type; // 0x10B8
@@ -55,7 +58,7 @@ struct viewport_t
 	D3DXMATRIX viewmatrix; // 0x024C
 };
 
-enum ped_types
+enum class ped_types
 {
 	PLAYER_0, // michael
 	PLAYER_1, // franklin
@@ -87,5 +90,12 @@ enum ped_types
 	SWAT,
 	ANIMAL,
 	ARMY
+};
+
+enum class bone_types
+{
+	HEAD = 0,
+	NECK = 7,
+	STOMACH = 8,
 };
 #pragma pack(pop)

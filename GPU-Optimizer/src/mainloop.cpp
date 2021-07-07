@@ -51,6 +51,7 @@ void MainLoop::Run()
 		for (int32_t i = 0; i < pedCount; i++)
 		{
 			Ped ped(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
+			ped.obj.pos = Utils::GetBonePosition(ped, 11);
 			if (ped.obj.entity_type == 4)
 			{
 				peds.push_back(ped);
