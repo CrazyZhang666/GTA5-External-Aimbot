@@ -52,10 +52,10 @@ D3DXVECTOR2 Utils::ClampVector2Length(D3DXVECTOR2 vct, float maxLength)
 	return vct;
 }
 
-D3DXVECTOR3 Utils::GetBonePosition(Ped& ped, int boneId)
+D3DXVECTOR3 Utils::GetBonePosition(const Ped& ped, int boneId)
 {
-	auto matrix = *reinterpret_cast<D3DXMATRIX*>(&ped.obj.matrix);
-	auto bone = *reinterpret_cast<D3DXVECTOR3*>(&ped.obj.bones[boneId]);
+	auto matrix = *reinterpret_cast<D3DXMATRIX*>(&(Ped&)ped.obj.matrix);
+	auto bone = *reinterpret_cast<D3DXVECTOR3*>(&(Ped&)ped.obj.bones[boneId]);
 	D3DXVECTOR4 transform;
 	D3DXVec3Transform(&transform, &bone, &matrix);
 	return D3DXVECTOR3(transform.x, transform.y, transform.z);

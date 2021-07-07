@@ -6,6 +6,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <array>
 
 MainLoop::MainLoop(const Memory* mem, const Init* init)
 	: m_mem(mem), m_init(init)
@@ -51,7 +52,6 @@ void MainLoop::Run()
 		for (int32_t i = 0; i < pedCount; i++)
 		{
 			Ped ped(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
-			ped.obj.pos = Utils::GetBonePosition(ped, 11);
 			if (ped.obj.entity_type == 4)
 			{
 				peds.push_back(ped);
@@ -76,15 +76,16 @@ void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo,
 {
 	constexpr float maxDistance = 150.0f;
 	constexpr float maxFov = 100.0f;
+	constexpr std::array bonesToAim = { bone_types::HEAD, bone_types::STOMACH };
 
-	static uint64_t rememberedTargetAddr = 0;
+	static std::optional<std::pair<uint64_t, bone_types>> rememberedTarget; // pair (pedAddr, boneId)
 
-	if (GetAsyncKeyState('X') & 0x8000 && localPlayerInfo.obj.is_aiming)
+	if (GetAsyncKeyState('C') & 0x8000 && localPlayerInfo.obj.is_aiming)
 	{
-		std::optional<std::tuple<uint64_t, float, D3DXVECTOR2>> bestTarget;
+		std::optional<std::tuple<uint64_t, bone_types, float, D3DXVECTOR2>> bestTarget;
 		for (const auto& ped : peds)
 		{
-			if (rememberedTargetAddr && ped.addr != rememberedTargetAddr)
+			if (rememberedTarget && ped.addr != rememberedTarget->first)
 			{
 				continue;
 			}
@@ -94,40 +95,49 @@ void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo,
 				continue;
 			}
 
-			decltype(bestTarget)::value_type current;
-			auto& [pedAddr, fov, delta] = current;
-			pedAddr = ped.addr;
-			auto screenPosOptional = Utils::WorldToScreen(ped.obj.pos, viewport);
-			if (!screenPosOptional)
+			for (auto bone : bonesToAim)
 			{
-				continue;
-			}
-			delta = screenPosOptional.value() - Utils::screenCenter;
-			fov = D3DXVec2Length(&delta);
+				//if (rememberedTarget && bone != rememberedTarget->second)
+				//{
+				//	continue;
+				//}
 
-			if (fov > maxFov)
-			{
-				continue;
-			}
+				decltype(bestTarget)::value_type current;
+				auto& [pedAddr, boneId, fov, delta] = current;
+				pedAddr = ped.addr;
+				boneId = bone;
+				auto screenPosOptional = Utils::WorldToScreen(Utils::GetBonePosition(ped, (int)boneId), viewport);
+				if (!screenPosOptional)
+				{
+					continue;
+				}
+				delta = screenPosOptional.value() - Utils::screenCenter;
+				fov = D3DXVec2Length(&delta);
 
-			if (!bestTarget || fov < std::get<1>(bestTarget.value()))
-			{
-				bestTarget = current;
+				if (fov > maxFov)
+				{
+					continue;
+				}
+
+				if (!bestTarget || fov < std::get<2>(bestTarget.value()))
+				{
+					bestTarget = current;
+				}
 			}
 		}
 
 		if (bestTarget)
 		{
-			auto [pedAddr, fov, delta] = bestTarget.value();
+			auto [pedAddr, boneId, fov, delta] = bestTarget.value();
 			auto deltaLength = D3DXVec2Length(&delta);
-			delta = delta / 2.5f + Utils::ClampVector2Length(delta, 2.5f);
+			delta = delta / 2.0f + Utils::ClampVector2Length(delta, 2.5f);
 			delta = Utils::ClampVector2Length(delta, deltaLength);
 			mouse_event(MOUSEEVENTF_MOVE, (DWORD)delta.x, (DWORD)delta.y, 0, 0);
-			rememberedTargetAddr = pedAddr;
+			rememberedTarget = std::make_pair(pedAddr, boneId);
 		}
 	}
 	else
 	{
-		rememberedTargetAddr = 0;
+		rememberedTarget.reset();
 	}
 }

@@ -92,7 +92,7 @@ enum class ped_types
 	ARMY
 };
 
-enum class bone_types
+enum class bone_types : int
 {
 	HEAD = 0,
 	NECK = 7,
