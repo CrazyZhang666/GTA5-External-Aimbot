@@ -1,5 +1,6 @@
 #include "mainloop.h"
 #include "natives.h"
+#include "objectwithaddr.h"
 #include "utils.h"
 
 #include <iostream>
@@ -21,7 +22,7 @@ void MainLoop::Run()
 	while (true)
 	{
 		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(100us);
+		std::this_thread::sleep_for(1000ms / 60);
 
 		if (!m_mem->IsTargetWindowValid())
 		{
@@ -32,75 +33,89 @@ void MainLoop::Run()
 		{
 			continue;
 		}
+		
+		Ped localPlayer(m_mem, m_mem->ReadPtr(m_init->world + 0x8));
+		if (!localPlayer.addr)
+		{
+			continue;
+		}
+		ProcessLocalPlayer(localPlayer);
 
 		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
-
-		auto localPlayerPtr = m_mem->ReadPtr(m_init->world + 0x8);
-		auto localPlayer = m_mem->Read<ped_t>(localPlayerPtr);
-		ProcessLocalPlayer(localPlayer, localPlayerPtr);
-		m_mem->Write(localPlayerPtr, localPlayer);
-
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
 		auto pedList = m_mem->ReadPtr(pedInterface + 0x100);
 		auto pedCount = m_mem->Read<int32_t>(pedInterface + 0x110);
 
-		std::optional<D3DXVECTOR2> closestFov;
-		//system("cls");
-		//std::cout << pedCount << std::endl;
+		std::vector<Ped> peds;
 		for (int32_t i = 0; i < pedCount; i++)
 		{
-			auto pedPtr = m_mem->ReadPtr(pedList + 0x10ull * i);
-			auto ped = m_mem->Read<ped_t>(pedPtr);
-
-			if (ped.entity_type != 4)
+			Ped ped(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
+			if (ped.obj.entity_type == 4)
 			{
-				continue;
+				peds.push_back(ped);
 			}
-
-			//std::cout << GetCorrectPedType(ped.ped_type) << ' ' << ped.health << ' ' << ped.armor;
-			//std::cout << std::hex << ' ' << pedPtr << std::dec;
-
-			auto screenPos = Utils::WorldToScreen(ped.pos, viewport);
-			if (screenPos)
-			{
-				//std::cout << ' ' << screenPos->x << ' ' << screenPos->y;
-
-				if (!closestFov || Utils::Distance(screenPos.value(), Utils::screenCenter) < Utils::Distance(closestFov.value(), Utils::screenCenter))
-				{
-					closestFov = screenPos;
-				}
-			}
-
-			if (ped.player_info)
-			{
-				auto player_info = m_mem->Read<player_info_t>(ped.player_info);
-				//std::cout << ' ' << "player" << ' ' << player_info.name;
-			}
-			if (pedPtr == localPlayerPtr)
-			{
-				//ped.bike_seatbelt = 0xC9;
-				//ped.health = 200.0f;
-				//m_mem->Write(pedPtr, ped);
-				//std::cout << ' ' << "localPlayer";
-			}
-			//std::cout << std::endl;
 		}
 
-		if (closestFov && GetAsyncKeyState('X') & 0x8000)
-		{
-			auto delta = closestFov.value() - Utils::screenCenter;
-			mouse_event(MOUSEEVENTF_MOVE, delta.x, delta.y, 0, 0);
-		}
+		Aimbot(localPlayer, peds, viewport);
 	}
 }
 
-void MainLoop::ProcessLocalPlayer(ped_t& localPlayer, uint64_t localPlayerPtr)
+void MainLoop::ProcessLocalPlayer(Ped& localPlayer)
 {
 	// Set full HP (shift + alt + f5).
-	//if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000)
-	if (GetAsyncKeyState(VK_LSHIFT) & 0x1)
+	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F5) & 0x1)
 	{
-		localPlayer.health = 150.0f + rand() % 50;
-		//m_mem->Write(localPlayerPtr, localPlayer);
+		localPlayer.obj.health = localPlayer.obj.max_health;
+		m_mem->Write(localPlayer.addr + offsetof(ped_t, health), localPlayer.obj.health);
+	}
+}
+
+void MainLoop::Aimbot(const Ped& localPlayer, const std::vector<Ped>& peds, const viewport_t& viewport)
+{
+	constexpr float maxDistance = 150.0f;
+	constexpr float maxFov = 100.0f;
+
+	if (!(GetAsyncKeyState('X') & 0x8000))
+	{
+		return;
+	}
+
+	std::optional<std::tuple<const Ped*, float, D3DXVECTOR2>> bestTarget;
+	for (const auto& ped : peds)
+	{
+		if (ped.addr == localPlayer.addr || Utils::Distance(ped.obj.pos, localPlayer.obj.pos) > maxDistance)
+		{
+			continue;
+		}
+
+		decltype(bestTarget)::value_type current;
+		auto& [pedPtr, fov, delta] = current;
+		pedPtr = &ped;
+		auto screenPosOptional = Utils::WorldToScreen(ped.obj.pos, viewport);
+		if (!screenPosOptional)
+		{
+			continue;
+		}
+		delta = screenPosOptional.value() - Utils::screenCenter;
+		fov = D3DXVec2Length(&delta);
+
+		if (fov > maxFov)
+		{
+			continue;
+		}
+
+		if (!bestTarget || fov < std::get<1>(bestTarget.value()))
+		{
+			bestTarget = current;
+		}
+	}
+
+	if (bestTarget)
+	{
+		auto [pedPtr, fov, delta] = bestTarget.value();
+		auto deltaLength = D3DXVec2Length(&delta);
+		delta = delta / 2.5f + Utils::ClampVector2Length(delta, 2.5f);
+		delta = Utils::ClampVector2Length(delta, deltaLength);
+		mouse_event(MOUSEEVENTF_MOVE, (DWORD)delta.x, (DWORD)delta.y, 0, 0);
 	}
 }

@@ -32,10 +32,22 @@ std::optional<D3DXVECTOR2> Utils::WorldToScreen(D3DXVECTOR3 worldPos, const view
 
 float Utils::Distance(D3DXVECTOR2 a, D3DXVECTOR2 b)
 {
-	return std::sqrtf((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
+	D3DXVECTOR2 relative = a - b;
+	return D3DXVec2Length(&relative);
 }
 
 float Utils::Distance(D3DXVECTOR3 a, D3DXVECTOR3 b)
 {
-	return std::sqrtf((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + (a.z - b.z) * (a.z - b.z));
+	D3DXVECTOR3 relative = a - b;
+	return D3DXVec3Length(&relative);
+}
+
+D3DXVECTOR2 Utils::ClampVector2Length(D3DXVECTOR2 vct, float maxLength)
+{
+	float currentLength = D3DXVec2Length(&vct);
+	if (currentLength > maxLength)
+	{
+		vct *= maxLength / currentLength;
+	}
+	return vct;
 }

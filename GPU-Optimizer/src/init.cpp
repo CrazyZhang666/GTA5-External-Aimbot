@@ -20,7 +20,11 @@ void Init::InitWorld(const Memory* mem)
 	}
 
 	auto worldInt = mem->Read<int32_t>(worldRef.value() + 0x3);
-	this->world = mem->ReadPtr(worldRef.value() + worldInt + 0x7);
+	world = mem->ReadPtr(worldRef.value() + worldInt + 0x7);
+	if (!world)
+	{
+		throw std::runtime_error("World not found.");
+	}
 }
 
 void Init::InitReplayInterface(const Memory* mem)
@@ -34,7 +38,11 @@ void Init::InitReplayInterface(const Memory* mem)
 	}
 
 	auto replayInterfaceInt = mem->Read<int32_t>(replayInterfaceRef.value() + 0x3);
-	this->replayInterface = mem->ReadPtr(replayInterfaceRef.value() + replayInterfaceInt + 0x7);
+	replayInterface = mem->ReadPtr(replayInterfaceRef.value() + replayInterfaceInt + 0x7);
+	if (!replayInterface)
+	{
+		throw std::runtime_error("Replay interface not found.");
+	}
 }
 
 void Init::InitViewport(const Memory* mem)
@@ -48,5 +56,9 @@ void Init::InitViewport(const Memory* mem)
 	}
 
 	auto viewportInt = mem->Read<int32_t>(viewportRef.value() + 0x3);
-	this->viewport = mem->ReadPtr(viewportRef.value() + viewportInt + 0x7);
+	viewport = mem->ReadPtr(viewportRef.value() + viewportInt + 0x7);
+	if (!viewport)
+	{
+		throw std::runtime_error("Viewport not found.");
+	}
 }
