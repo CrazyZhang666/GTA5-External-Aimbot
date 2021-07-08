@@ -7,6 +7,7 @@
 #include <chrono>
 #include <thread>
 #include <array>
+#include <unordered_map>
 
 MainLoop::MainLoop(const Memory* mem, const Init* init)
 	: m_mem(mem), m_init(init)
@@ -35,30 +36,67 @@ void MainLoop::Run()
 			continue;
 		}
 		
-		Ped localPlayer(m_mem, m_mem->ReadPtr(m_init->world + 0x8));
-		if (!localPlayer.addr)
+		auto localPlayer = std::make_unique<Ped>(m_mem, m_mem->ReadPtr(m_init->world + 0x8));
+		if (!localPlayer->addr)
 		{
 			continue;
 		}
-		PlayerInfo localPlayerInfo(m_mem, localPlayer.obj.player_info);
-		ProcessLocalPlayer(localPlayer, localPlayerInfo);
+		auto localPlayerInfo = std::make_unique<PlayerInfo>(m_mem, localPlayer->obj.player_info);
+		ProcessLocalPlayer(*localPlayer, *localPlayerInfo);
+		WeaponHacks(*localPlayer);
 
 		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
 		auto pedList = m_mem->ReadPtr(pedInterface + 0x100);
 		auto pedCount = m_mem->Read<int32_t>(pedInterface + 0x110);
 
-		std::vector<Ped> peds;
+		std::vector<std::unique_ptr<Ped>> peds;
 		for (int32_t i = 0; i < pedCount; i++)
 		{
-			Ped ped(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
-			if (ped.obj.entity_type == 4)
+			auto ped = std::make_unique<Ped>(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
+			if (ped->obj.entity_type == 4)
 			{
-				peds.push_back(ped);
+				peds.push_back(std::move(ped));
 			}
 		}
 
-		Aimbot(localPlayer, localPlayerInfo, peds, viewport);
+		Aimbot(*localPlayer, *localPlayerInfo, peds, viewport);
+	}
+}
+
+void MainLoop::WeaponHacks(Ped& localPlayer)
+{
+	constexpr float spreadModifier = 0.4f;
+	constexpr float recoilModifier = 0.4f;
+
+	auto weaponManager = m_mem->Read<weapon_manager_t>(localPlayer.obj.weapon_manager);
+	if (!weaponManager.current_weapon)
+	{
+		return;
+	}
+	auto currentWeapon = std::make_unique<Weapon>(m_mem, weaponManager.current_weapon);
+
+	struct WeaponModifiable
+	{
+		float spread;
+		float recoil;
+	};
+
+	static std::unordered_map<decltype(weapon_t::name_hash), WeaponModifiable> originalValues;
+	if (!originalValues.count(currentWeapon->obj.name_hash))
+	{
+		originalValues[currentWeapon->obj.name_hash] = { currentWeapon->obj.spread, currentWeapon->obj.recoil };
+	}
+
+	const auto& currentOriginal = originalValues[currentWeapon->obj.name_hash];
+	WeaponModifiable currentModified = { currentOriginal.spread * spreadModifier, currentOriginal.recoil * recoilModifier };
+	if (currentWeapon->obj.spread != currentModified.spread)
+	{
+		m_mem->Write<float>(currentWeapon->addr + offsetof(weapon_t, spread), currentModified.spread);
+	}
+	if (currentWeapon->obj.recoil != currentModified.recoil)
+	{
+		m_mem->Write<float>(currentWeapon->addr + offsetof(weapon_t, recoil), currentModified.recoil);
 	}
 }
 
@@ -72,10 +110,11 @@ void MainLoop::ProcessLocalPlayer(Ped& localPlayer, PlayerInfo& localPlayerInfo)
 	}
 }
 
-void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<Ped>& peds, const viewport_t& viewport)
+void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<std::unique_ptr<Ped>>& peds, const viewport_t& viewport)
 {
-	constexpr float maxDistance = 150.0f;
-	constexpr float maxFov = 100.0f;
+	constexpr float maxDistance = 200.0f;
+	constexpr float maxFov = 75.0f;
+	constexpr float velocityMultiplier = 0.05f;
 	constexpr std::array bonesToAim = { bone_types::HEAD, bone_types::STOMACH };
 
 	static std::optional<std::pair<uint64_t, bone_types>> rememberedTarget; // pair (pedAddr, boneId)
@@ -85,12 +124,12 @@ void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo,
 		std::optional<std::tuple<uint64_t, bone_types, float, D3DXVECTOR2>> bestTarget;
 		for (const auto& ped : peds)
 		{
-			if (rememberedTarget && ped.addr != rememberedTarget->first)
+			if (rememberedTarget && ped->addr != rememberedTarget->first)
 			{
 				continue;
 			}
 
-			if (ped.addr == localPlayer.addr || Utils::Distance(ped.obj.pos, localPlayer.obj.pos) > maxDistance)
+			if (ped->addr == localPlayer.addr || ped->obj.health <= 0.0f || Utils::Distance(ped->obj.pos, localPlayer.obj.pos) > maxDistance)
 			{
 				continue;
 			}
@@ -104,9 +143,10 @@ void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo,
 
 				decltype(bestTarget)::value_type current;
 				auto& [pedAddr, boneId, fov, delta] = current;
-				pedAddr = ped.addr;
+				pedAddr = ped->addr;
 				boneId = bone;
-				auto screenPosOptional = Utils::WorldToScreen(Utils::GetBonePosition(ped, (int)boneId), viewport);
+				auto velocityOffset = ped->obj.velocity * velocityMultiplier;
+				auto screenPosOptional = Utils::WorldToScreen(Utils::GetBonePosition(*ped, (int)boneId) + velocityOffset, viewport);
 				if (!screenPosOptional)
 				{
 					continue;
@@ -130,7 +170,7 @@ void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo,
 		{
 			auto [pedAddr, boneId, fov, delta] = bestTarget.value();
 			auto deltaLength = D3DXVec2Length(&delta);
-			delta = delta / 2.0f + Utils::ClampVector2Length(delta, 2.5f);
+			delta = delta / 3.0f + Utils::ClampVector2Length(delta, 2.5f);
 			delta = Utils::ClampVector2Length(delta, deltaLength);
 			mouse_event(MOUSEEVENTF_MOVE, (DWORD)delta.x, (DWORD)delta.y, 0, 0);
 			rememberedTarget = std::make_pair(pedAddr, boneId);

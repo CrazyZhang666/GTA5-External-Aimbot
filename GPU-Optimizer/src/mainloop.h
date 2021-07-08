@@ -5,6 +5,8 @@
 #include "objectwithaddr.h"
 #include "natives.h"
 
+#include <memory>
+
 class MainLoop
 {
 public:
@@ -14,7 +16,8 @@ public:
 
 private:
 	void ProcessLocalPlayer(Ped& localPlayer, PlayerInfo& localPlayerInfo);
-	void Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<Ped>& peds, const viewport_t& viewport);
+	void WeaponHacks(Ped& localPlayer);
+	void Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<std::unique_ptr<Ped>>& peds, const viewport_t& viewport);
 
 private:
 	const Memory* m_mem;

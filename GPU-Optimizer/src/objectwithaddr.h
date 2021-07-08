@@ -31,3 +31,4 @@ struct ObjectWithAddr
 using Ped = ObjectWithAddr<ped_t>;
 using Entity = ObjectWithAddr<entity_t>;
 using PlayerInfo = ObjectWithAddr<player_info_t>;
+using Weapon = ObjectWithAddr<weapon_t>;

@@ -26,7 +26,9 @@ struct entity_t
 
 struct ped_t : entity_t
 {
-	char pad_0x02A4[0x18C]; // 0x02A4
+	char pad_0x02A4[0x07C]; // 0x02A4
+	D3DXVECTOR3 velocity; // 0x0320
+	char pad_0x032C[0x104]; // 0x032C
 	D3DXVECTOR4 bones[12]; // 0x0430
 	char pad_0x04F0[0x840]; // 0x04F0
 	uint64_t vehicle; // 0x0D30
@@ -34,7 +36,9 @@ struct ped_t : entity_t
 	uint32_t ped_type; // 0x10B8
 	char pad_0x10BC[0xC]; // 0x10BC
 	uint64_t player_info; // 0x10C8
-	char pad_0x10D0[0x33C]; // 0x10D0
+	char pad_0x10D0[0x8]; // 0x10D0
+	uint64_t weapon_manager; // 0x10D8
+	char pad_0x10E0[0x32C]; // 0x10E0
 	BYTE bike_seatbelt; // 0x140C (0xC8 = off; 0xC9 = on)
 	char pad_0x140D[0xB]; // 0x140D
 	BYTE vehicle_seatbelt; // 0x1418 (0x01 = off; 0x00 = on)
@@ -56,6 +60,22 @@ struct viewport_t
 {
 	char pad_0x0000[0x24C]; // 0x0000
 	D3DXMATRIX viewmatrix; // 0x024C
+};
+
+struct weapon_manager_t
+{
+	char pad_0x0000[0x20]; // 0x0000
+	uint64_t current_weapon; // 0x0008
+};
+
+struct weapon_t
+{
+	char pad_0x0000[0x10]; // 0x0000
+	uint32_t name_hash; // 0x0010
+	char pad_0x0014[0x70]; // 0x0014
+	float spread; // 0x0084
+	char pad_0x0088[0x26C]; // 0x0088
+	float recoil; // 0x02F4
 };
 
 enum class ped_types

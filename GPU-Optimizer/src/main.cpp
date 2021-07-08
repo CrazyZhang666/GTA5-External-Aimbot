@@ -14,7 +14,9 @@ int main()
 		try
 		{
 			system("cls");
-			auto mem = std::make_unique<Memory>(std::vector<std::wstring_view>{ L"Grand Theft Auto V", L"RAG≈ Multipl‡ÛÂr" }, L"GTA5.exe", PROCESS_ALL_ACCESS);
+			auto mem = std::make_unique<Memory>(std::vector<std::wstring_view>{
+				L"Grand Theft Auto V", L"RAG≈ Multipl‡ÛÂr", L"RAGE Multiplayer", L"RAG≈ Multipl‡ÛÂr ", L"RAGE Multiplayer ",
+			}, L"GTA5.exe", PROCESS_ALL_ACCESS);
 			auto init = std::make_unique<Init>(mem.get());
 			auto mainLoop = std::make_unique<MainLoop>(mem.get(), init.get());
 			mainLoop->Run();
