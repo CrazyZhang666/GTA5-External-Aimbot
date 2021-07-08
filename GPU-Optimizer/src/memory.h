@@ -8,14 +8,14 @@
 class Memory
 {
 public:
-	Memory(std::vector<std::wstring_view>&& windowNames, std::wstring_view moduleName, DWORD accessRights = PROCESS_ALL_ACCESS);
+	Memory(std::wstring_view processName, const std::vector<std::wstring_view>& windowNameContains,
+		std::wstring_view moduleName, DWORD accessRights = PROCESS_ALL_ACCESS);
 
 	~Memory();
 
 	std::optional<uint64_t> PatternScan(uint64_t start, DWORD size, const BYTE* pattern, std::string_view mask, DWORD patternSize) const;
 
 	bool IsTargetWindowMaximized() const;
-
 	bool IsTargetWindowValid() const;
 
 	template<typename T>
@@ -44,6 +44,8 @@ private:
 		DWORD size;
 	};
 
+	std::optional<DWORD> GetPid(std::wstring_view processName) const;
+	std::optional<HWND> ScanForWindow(DWORD pid, const std::vector<std::wstring_view>& windowNameContains);
 	std::optional<Module> GetModule(DWORD pid, std::wstring_view moduleName) const;
 
 public:

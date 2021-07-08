@@ -4,27 +4,22 @@
 #include <stdexcept>
 #include <memory>
 
-Memory::Memory(std::vector<std::wstring_view>&& windowNames, std::wstring_view moduleName, DWORD accessRights)
+Memory::Memory(std::wstring_view processName, const std::vector<std::wstring_view>& windowNameContains,
+	std::wstring_view moduleName, DWORD accessRights)
 {
-	m_targetWindow = 0;
-	for (auto windowName : windowNames)
-	{
-		if (m_targetWindow = FindWindow(nullptr, windowName.data()))
-		{
-			break;
-		}
-	}
-	if (!m_targetWindow)
-	{
-		throw std::runtime_error("Target window not found.");
-	}
-
-	DWORD pid;
-	GetWindowThreadProcessId(m_targetWindow, &pid);
-	if (!pid)
+	auto pidOptional = GetPid(processName);
+	if (!pidOptional)
 	{
 		throw std::runtime_error("Pid not found.");
 	}
+	auto pid = pidOptional.value();
+
+	auto targetWindowOptional = ScanForWindow(pid, windowNameContains);
+	if (!targetWindowOptional)
+	{
+		throw std::runtime_error("Target window not found.");
+	}
+	m_targetWindow = targetWindowOptional.value();
 
 	auto module = GetModule(pid, moduleName);
 	if (!module)
@@ -43,6 +38,30 @@ Memory::Memory(std::vector<std::wstring_view>&& windowNames, std::wstring_view m
 Memory::~Memory()
 {
 	CloseHandle(m_process);
+}
+
+std::optional<HWND> Memory::ScanForWindow(DWORD pid, const std::vector<std::wstring_view>& windowNameContains)
+{
+	HWND currentWindow = NULL;
+	do
+	{
+		currentWindow = FindWindowEx(NULL, currentWindow, NULL, NULL);
+		DWORD currentWindowPid;
+		GetWindowThreadProcessId(currentWindow, &currentWindowPid);
+		if (currentWindowPid == pid)
+		{
+			for (auto windowNameSubstring : windowNameContains)
+			{
+				wchar_t currentWindowName[MAX_PATH];
+				GetWindowText(currentWindow, currentWindowName, _countof(currentWindowName));
+				if (std::wstring_view(currentWindowName).find(windowNameSubstring) != std::wstring_view::npos)
+				{
+					return currentWindow;
+				}
+			}
+		}
+	} while (currentWindow != NULL);
+	return {};
 }
 
 bool CheckPattern(const BYTE* data, const BYTE* pattern, std::string_view mask, DWORD patternSize)
@@ -79,6 +98,27 @@ bool Memory::IsTargetWindowMaximized() const
 bool Memory::IsTargetWindowValid() const
 {
 	return IsWindow(m_targetWindow);
+}
+
+std::optional<DWORD> Memory::GetPid(std::wstring_view processName) const
+{
+	PROCESSENTRY32 entry;
+	entry.dwSize = sizeof(PROCESSENTRY32);
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+	std::optional<DWORD> pid;
+	if (Process32First(snapshot, &entry))
+	{
+		do
+		{
+			if (_wcsicmp(entry.szExeFile, processName.data()) == 0)
+			{
+				pid = entry.th32ProcessID;
+				break;
+			}
+		} while (Process32Next(snapshot, &entry));
+	}
+	CloseHandle(snapshot);
+	return pid;
 }
 
 std::optional<Memory::Module> Memory::GetModule(DWORD pid, std::wstring_view moduleName) const
