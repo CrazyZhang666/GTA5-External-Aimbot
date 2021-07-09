@@ -110,26 +110,6 @@ void MainLoop::WeaponHacks(Ped& localPlayer)
 
 void MainLoop::ProcessLocalPlayer(Ped& localPlayer, PlayerInfo& localPlayerInfo)
 {
-	// Set full HP (shift + alt + f5).
-	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F5) & 0x1)
-	{
-		localPlayer.obj.health = localPlayer.obj.max_health;
-		m_mem->Write(localPlayer.addr + offsetof(ped_t, health), localPlayer.obj.health);
-	}
-
-	// Set full armor (shift + alt + f6).
-	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F6) & 0x1)
-	{
-		localPlayer.obj.armor = 100.0f;
-		m_mem->Write(localPlayer.addr + offsetof(ped_t, armor), localPlayer.obj.armor);
-	}
-
-	// Reset armor (shift + alt + f7).
-	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F7) & 0x1)
-	{
-		localPlayer.obj.armor = 0.0f;
-		m_mem->Write(localPlayer.addr + offsetof(ped_t, armor), localPlayer.obj.armor);
-	}
 }
 
 void MainLoop::Aimbot(const Ped& localPlayer, const PlayerInfo& localPlayerInfo, const std::vector<std::unique_ptr<Ped>>& peds, const viewport_t& viewport)
