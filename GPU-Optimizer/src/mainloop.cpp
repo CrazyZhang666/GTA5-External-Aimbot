@@ -1,3 +1,5 @@
+#define NOMINMAX
+
 #include "mainloop.h"
 #include "natives.h"
 #include "objectwithaddr.h"
@@ -48,12 +50,18 @@ void MainLoop::Run()
 		auto viewport = m_mem->Read<viewport_t>(m_init->viewport);
 		auto pedInterface = m_mem->ReadPtr(m_init->replayInterface + 0x18);
 		auto pedList = m_mem->ReadPtr(pedInterface + 0x100);
-		auto pedCount = m_mem->Read<int32_t>(pedInterface + 0x110);
+		auto pedMaxPtrs = m_mem->Read<int32_t>(pedInterface + 0x108);
 
 		std::vector<std::unique_ptr<Ped>> peds;
-		for (int32_t i = 0; i < pedCount; i++)
+		for (int32_t i = 0; i < pedMaxPtrs; i++)
 		{
-			auto ped = std::make_unique<Ped>(m_mem, m_mem->ReadPtr(pedList + 0x10ull * i));
+			auto pedPtr = m_mem->ReadPtr(pedList + 0x10ull * i);
+			if (!pedPtr)
+			{
+				continue;
+			}
+
+			auto ped = std::make_unique<Ped>(m_mem, pedPtr);
 			if (ped->obj.entity_type == 4)
 			{
 				peds.push_back(std::move(ped));
@@ -107,6 +115,20 @@ void MainLoop::ProcessLocalPlayer(Ped& localPlayer, PlayerInfo& localPlayerInfo)
 	{
 		localPlayer.obj.health = localPlayer.obj.max_health;
 		m_mem->Write(localPlayer.addr + offsetof(ped_t, health), localPlayer.obj.health);
+	}
+
+	// Set full armor (shift + alt + f6).
+	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F6) & 0x1)
+	{
+		localPlayer.obj.armor = 100.0f;
+		m_mem->Write(localPlayer.addr + offsetof(ped_t, armor), localPlayer.obj.armor);
+	}
+
+	// Reset armor (shift + alt + f7).
+	if (GetAsyncKeyState(VK_SHIFT) & 0x8000 && GetAsyncKeyState(VK_LMENU) & 0x8000 && GetAsyncKeyState(VK_F7) & 0x1)
+	{
+		localPlayer.obj.armor = 0.0f;
+		m_mem->Write(localPlayer.addr + offsetof(ped_t, armor), localPlayer.obj.armor);
 	}
 }
 
